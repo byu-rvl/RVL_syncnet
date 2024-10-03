@@ -27,4 +27,26 @@ s = SyncNetInstance();
 s.loadParameters(opt.initial_model);
 print("Model %s loaded."%opt.initial_model);
 
-s.evaluate(opt, videofile=opt.videofile)
+offset, conf, dists_npy, fconfm =  s.evaluate(opt, videofile=opt.videofile)
+frames = []
+import cv2
+vidCap = cv2.VideoCapture(os.path.join(opt.tmp_dir,opt.reference,'video.mp4'))
+while vidCap.isOpened():
+    ret, frame = vidCap.read()
+    if not ret:
+        break
+    frames.append(frame)
+vidCap.release()
+vidWriter = cv2.VideoWriter(os.path.join(opt.tmp_dir,opt.reference,'video_sync.mp4'), cv2.VideoWriter_fourcc(*'mp4v'), 25, (frames[0].shape[1],frames[0].shape[0]))
+vidWriterTrimmed = cv2.VideoWriter(os.path.join(opt.tmp_dir,opt.reference,'video_sync_trimmed.mp4'), cv2.VideoWriter_fourcc(*'mp4v'), 25, (frames[0].shape[1],frames[0].shape[0]))
+threshold = 0
+print(os.path.join(opt.tmp_dir,opt.reference,'video_sync.mp4'))
+for i in range(4,len(frames)-10):
+    conf = fconfm[i-4]
+    image = frames[i]
+    cv2.putText(image, '%.2f'%conf, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    if conf>threshold:
+        vidWriterTrimmed.write(image)
+    vidWriter.write(image)
+vidWriter.release()
+vidWriterTrimmed.release()

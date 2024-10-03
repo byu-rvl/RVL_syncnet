@@ -37,7 +37,7 @@ class SyncNetInstance(torch.nn.Module):
     def __init__(self, dropout = 0, num_layers_in_fc_layers = 1024):
         super(SyncNetInstance, self).__init__();
 
-        self.__S__ = S(num_layers_in_fc_layers = num_layers_in_fc_layers).cuda();
+        self.__S__ = S(num_layers_in_fc_layers = num_layers_in_fc_layers)
 
     def evaluate(self, opt, videofile):
 
@@ -51,11 +51,21 @@ class SyncNetInstance(torch.nn.Module):
           rmtree(os.path.join(opt.tmp_dir,opt.reference))
 
         os.makedirs(os.path.join(opt.tmp_dir,opt.reference))
-
-        command = ("ffmpeg -y -i %s -threads 1 -f image2 %s" % (videofile,os.path.join(opt.tmp_dir,opt.reference,'%06d.jpg'))) 
+        output_video_path = os.path.join(opt.tmp_dir,opt.reference,'video.mp4')
+        command = [
+                'ffmpeg', 
+                '-i', videofile,  # Input file
+                '-r', str(25),      # New frame rate
+                '-ar', str(16000),
+                '-y',                    # Overwrite output files without asking
+                output_video_path        # Output file
+            ]
+            
+        subprocess.run(command, check=True)
+        command = ("ffmpeg -y -i %s -threads 1 -f image2 %s" % (output_video_path,os.path.join(opt.tmp_dir,opt.reference,'%06d.jpg'))) 
         output = subprocess.call(command, shell=True, stdout=None)
 
-        command = ("ffmpeg -y -i %s -async 1 -ac 1 -vn -acodec pcm_s16le -ar 16000 %s" % (videofile,os.path.join(opt.tmp_dir,opt.reference,'audio.wav'))) 
+        command = ("ffmpeg -y -i %s -async 1 -ac 1 -vn -acodec pcm_s16le -ar 16000 %s" % (output_video_path,os.path.join(opt.tmp_dir,opt.reference,'audio.wav'))) 
         output = subprocess.call(command, shell=True, stdout=None)
         
         # ========== ==========
@@ -68,8 +78,11 @@ class SyncNetInstance(torch.nn.Module):
         flist.sort()
 
         for fname in flist:
-            images.append(cv2.imread(fname))
-
+            image = cv2.imread(fname)
+            #resize to 224x224
+            image = cv2.resize(image, (224, 224))
+            images.append(image)
+        print('Number of frames: %d' % len(images) )
         im = numpy.stack(images,axis=3)
         im = numpy.expand_dims(im,axis=0)
         im = numpy.transpose(im,(0,3,4,1,2))
@@ -109,17 +122,19 @@ class SyncNetInstance(torch.nn.Module):
             
             im_batch = [ imtv[:,:,vframe:vframe+5,:,:] for vframe in range(i,min(lastframe,i+opt.batch_size)) ]
             im_in = torch.cat(im_batch,0)
-            im_out  = self.__S__.forward_lip(im_in.cuda());
+            im_out  = self.__S__.forward_lip(im_in);
             im_feat.append(im_out.data.cpu())
 
             cc_batch = [ cct[:,:,:,vframe*4:vframe*4+20] for vframe in range(i,min(lastframe,i+opt.batch_size)) ]
             cc_in = torch.cat(cc_batch,0)
-            cc_out  = self.__S__.forward_aud(cc_in.cuda())
+            cc_out  = self.__S__.forward_aud(cc_in)
             cc_feat.append(cc_out.data.cpu())
-
+        print(f"im_feat length {len(im_feat)}")
         im_feat = torch.cat(im_feat,0)
+        print(f"im_feat shape {im_feat.shape}")
         cc_feat = torch.cat(cc_feat,0)
-
+        print(f"cc_feat shape {cc_feat.shape}")
+        cc_feat = torch.zeros_like(cc_feat)
         # ========== ==========
         # Compute offset
         # ========== ==========
@@ -145,7 +160,7 @@ class SyncNetInstance(torch.nn.Module):
         print('AV offset: \t%d \nMin dist: \t%.3f\nConfidence: \t%.3f' % (offset,minval,conf))
 
         dists_npy = numpy.array([ dist.numpy() for dist in dists ])
-        return offset.numpy(), conf.numpy(), dists_npy
+        return offset.numpy(), conf.numpy(), dists_npy, fconfm
 
     def extract_feature(self, opt, videofile):
 
@@ -184,7 +199,7 @@ class SyncNetInstance(torch.nn.Module):
             
             im_batch = [ imtv[:,:,vframe:vframe+5,:,:] for vframe in range(i,min(lastframe,i+opt.batch_size)) ]
             im_in = torch.cat(im_batch,0)
-            im_out  = self.__S__.forward_lipfeat(im_in.cuda());
+            im_out  = self.__S__.forward_lipfeat(im_in);
             im_feat.append(im_out.data.cpu())
 
         im_feat = torch.cat(im_feat,0)
