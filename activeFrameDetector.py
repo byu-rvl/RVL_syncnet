@@ -15,9 +15,7 @@ from shutil import rmtree
 from detectors import S3FD
 from scipy import signal
 import numpy as np
-from facetools.detection import get_cropped_face_img
-from facetools.motion import detectFace_helper
-from facetools.data import FRAME_ANALYZE_CROP_FACE_IMAGE_EXPANSION, FRAME_ANALYZE_CROP_FACE_IMAGE_TARGET_SIZE
+from facetools import get_cropped_face_img, detectFace_helper, FRAME_ANALYZE_CROP_FACE_IMAGE_EXPANSION, FRAME_ANALYZE_CROP_FACE_IMAGE_TARGET_SIZE
 
 # ==================== Get OFFSET ====================
 
