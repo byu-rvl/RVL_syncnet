@@ -13,7 +13,8 @@ from pathlib import Path
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
-
+FRAME_ANALYZE_CROP_FACE_IMAGE_EXPANSION = 1.3
+FRAME_ANALYZE_CROP_FACE_IMAGE_TARGET_SIZE = 160
 
 class ImageSequence:
 
